@@ -1,3 +1,8 @@
+import sys, types
+# Patch para "enganar" import de audioop em ambientes sem audioop (ex: Python 3.13 no Render).
+# IMPORTANTE: isso desativa recursos de áudio/voice — use apenas se não precisar de voz.
+sys.modules['audioop'] = types.ModuleType('audioop')
+
 import os
 import discord
 from discord.ext import commands
