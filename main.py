@@ -1,17 +1,15 @@
 import sys, types
-# Patch para "enganar" import de audioop (desativa voice/audio)
+# ⚡ Patch para "enganar" import de audioop e desativar voice/audio
 sys.modules['audioop'] = types.ModuleType('audioop')
 
-import os
+import os, asyncio
 import discord
 from discord.ext import commands
 from flask import Flask, jsonify
-import asyncio
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import aiohttp
-from hypercorn.asyncio import serve
-from hypercorn.config import Config
+from starlette.middleware.wsgi import WSGIMiddleware
 
 # ==========================
 # 🔧 Configurações Iniciais
@@ -41,7 +39,7 @@ def status():
     return jsonify({"status": "online", "bot": "Unibot Pagamentos", "version": "1.0"})
 
 # ==========================
-# 🤖 Bot Customizado
+# 🤖 Discord Bot
 # ==========================
 
 class CustomBot(commands.Bot):
@@ -59,6 +57,7 @@ class CustomBot(commands.Bot):
         os.makedirs("comprovantes", exist_ok=True)
         print("📁 Diretório 'comprovantes' verificado/criado")
 
+        # Carrega cogs automaticamente
         cogs_carregados = 0
         for filename in os.listdir("./cogs"):
             if filename.endswith(".py") and not filename.startswith("_"):
@@ -73,47 +72,33 @@ class CustomBot(commands.Bot):
         asyncio.create_task(self.auto_ping())
 
     async def on_ready(self):
-        print("=" * 50)
-        print(f"✅ BOT ONLINE!")
-        print(f"👤 Nome: {self.user}")
-        print(f"🆔 ID: {self.user.id}")
+        print("="*50)
+        print(f"✅ BOT ONLINE! {self.user} ({self.user.id})")
         print(f"🌐 Servidores: {len(self.guilds)}")
-        print("=" * 50)
+        print("="*50)
 
     async def auto_ping(self):
         await asyncio.sleep(60)
         while True:
-            try:
-                if AUTOPING:
+            if AUTOPING:
+                try:
                     async with aiohttp.ClientSession() as session:
                         await session.get(AUTOPING)
-                        print("🔄 [AutoPing] Ping enviado com sucesso.")
-            except Exception as e:
-                print(f"❌ [AutoPing] Erro ao enviar ping: {e}")
+                        print("🔄 [AutoPing] Ping enviado")
+                except Exception as e:
+                    print(f"❌ [AutoPing] Erro: {e}")
             await asyncio.sleep(300)
-
-# ==========================
-# 🚀 Inicialização
-# ==========================
 
 bot = CustomBot(command_prefix="!", intents=intents)
 bot.remove_command("help")
 
-async def run_bot():
-    await bot.start(TOKEN)
+# ==========================
+# ⚡ ASGI para Gunicorn
+# ==========================
 
-async def run_flask():
-    config = Config()
-    config.bind = [f"0.0.0.0:{int(os.environ.get('PORT', 10000))}"]
-    config.worker_class = "asyncio"
-    await serve(app, config)
+# Flask via Starlette WSGIMiddleware
+application = WSGIMiddleware(app)
 
-async def main():
-    # roda Flask + Discord bot simultaneamente
-    await asyncio.gather(run_bot(), run_flask())
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("👋 Encerrando aplicação...")
+# Inicia bot no background
+asyncio.get_event_loop().create_task(bot.start(TOKEN))
+asyncio.get_event_loop().create_task(bot.auto_ping())
