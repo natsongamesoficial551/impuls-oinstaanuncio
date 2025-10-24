@@ -7,7 +7,6 @@ sys.modules['audioop'] = types.ModuleType('audioop')
 import os
 import discord
 from discord.ext import commands
-from flask import Flask, jsonify
 import asyncio
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -24,19 +23,6 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 intents = discord.Intents.all()
-
-# ==========================
-# 🌐 Flask App
-# ==========================
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "✅ Bot de Pagamentos Unibot está rodando com sucesso!"
-
-@app.route("/status")
-def status():
-    return jsonify({"status": "online", "bot": "Unibot Pagamentos", "version": "1.0"})
 
 # ==========================
 # 🤖 Bot Customizado
@@ -93,13 +79,5 @@ class CustomBot(commands.Bot):
 bot = CustomBot(command_prefix="!", intents=intents)
 bot.remove_command("help")
 
-# ==========================
-# ⚡ Rodar Flask + Bot
-# ==========================
 if __name__ == "__main__":
-    # inicia o bot como tarefa paralela
-    loop = asyncio.get_event_loop()
-    loop.create_task(bot.start(TOKEN))
-    
-    # roda o Flask normalmente
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    asyncio.run(bot.start(TOKEN))
