@@ -56,7 +56,6 @@ class CustomBot(commands.Bot):
             self.supabase = None
 
     async def setup_hook(self):
-        """Carrega cogs e inicia auto-ping"""
         os.makedirs("comprovantes", exist_ok=True)
         print("📁 Diretório 'comprovantes' verificado/criado")
 
@@ -82,7 +81,6 @@ class CustomBot(commands.Bot):
         print("=" * 50)
 
     async def auto_ping(self):
-        """Mantém o Render ativo"""
         await asyncio.sleep(60)
         while True:
             try:
@@ -110,9 +108,12 @@ async def run_flask():
     config.worker_class = "asyncio"
     await serve(app, config)
 
+async def main():
+    # roda Flask + Discord bot simultaneamente
+    await asyncio.gather(run_bot(), run_flask())
+
 if __name__ == "__main__":
     try:
-        # roda Flask + Discord simultaneamente
-        asyncio.run(asyncio.gather(run_bot(), run_flask()))
+        asyncio.run(main())
     except KeyboardInterrupt:
         print("👋 Encerrando aplicação...")
