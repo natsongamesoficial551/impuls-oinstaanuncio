@@ -4,8 +4,6 @@ import types
 # ⚡ Evita erro de áudio no Render
 sys.modules['audioop'] = types.ModuleType('audioop')
 
-import sys
-import types
 import os
 import discord
 from discord.ext import commands
@@ -14,9 +12,6 @@ import asyncio
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import aiohttp
-from hypercorn.asyncio import serve
-from hypercorn.config import Config
-from starlette.middleware.wsgi import WSGIMiddleware
 
 # ==========================
 # 🔧 Configurações Iniciais
@@ -99,15 +94,12 @@ bot = CustomBot(command_prefix="!", intents=intents)
 bot.remove_command("help")
 
 # ==========================
-# ⚡ Função ASGI para Render
+# ⚡ Rodar Flask + Bot
 # ==========================
-async def asgi_app(scope, receive, send):
-    if scope['type'] == 'http':
-        # converte Flask WSGI para ASGI
-        wsgi_app = WSGIMiddleware(app)
-        await wsgi_app(scope, receive, send)
-    else:
-        # apenas roda bot Discord como tarefa separada
-        asyncio.create_task(bot.start(TOKEN))
-
-application = asgi_app
+if __name__ == "__main__":
+    # inicia o bot como tarefa paralela
+    loop = asyncio.get_event_loop()
+    loop.create_task(bot.start(TOKEN))
+    
+    # roda o Flask normalmente
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
