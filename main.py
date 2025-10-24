@@ -1,13 +1,16 @@
 import os
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 from flask import Flask, jsonify
 import asyncio
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import aiohttp
 
-# Carregar variáveis do .env
+# ==========================
+# 🔧 Configurações Iniciais
+# ==========================
+
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -15,10 +18,12 @@ AUTOPING = os.getenv("AUTOPING")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Intents do bot
 intents = discord.Intents.all()
 
-# Instância Flask
+# ==========================
+# 🌐 Flask App
+# ==========================
+
 app = Flask(__name__)
 
 @app.route("/")
@@ -30,10 +35,14 @@ def status():
     return jsonify({"status": "online", "bot": "Unibot Pagamentos", "version": "1.0"})
 
 
-# Bot customizado
+# ==========================
+# 🤖 Bot Customizado
+# ==========================
+
 class CustomBot(commands.Bot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
         try:
             self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
             print("✅ Conectado ao Supabase com sucesso!")
@@ -42,11 +51,10 @@ class CustomBot(commands.Bot):
             self.supabase = None
 
     async def setup_hook(self):
-        # Criar diretório de comprovantes
+        """Carrega cogs e inicia auto-ping"""
         os.makedirs("comprovantes", exist_ok=True)
         print("📁 Diretório 'comprovantes' verificado/criado")
-        
-        # Carregar cogs automaticamente
+
         cogs_carregados = 0
         for filename in os.listdir("./cogs"):
             if filename.endswith(".py") and not filename.startswith("_"):
@@ -56,16 +64,21 @@ class CustomBot(commands.Bot):
                     cogs_carregados += 1
                 except Exception as e:
                     print(f"❌ [ERRO] Falha ao carregar {filename}: {e}")
+
         print(f"📊 Total de cogs carregados: {cogs_carregados}")
-        
-        # Iniciar auto-ping como task assíncrona
-        self.loop.create_task(self.auto_ping())
+        asyncio.create_task(self.auto_ping())  # usa create_task direto
 
     async def on_ready(self):
-        print(f"✅ BOT ONLINE! Nome: {self.user} | Servidores: {len(self.guilds)}")
+        print("=" * 50)
+        print(f"✅ BOT ONLINE!")
+        print(f"👤 Nome: {self.user}")
+        print(f"🆔 ID: {self.user.id}")
+        print(f"🌐 Servidores: {len(self.guilds)}")
+        print("=" * 50)
 
     async def auto_ping(self):
-        await asyncio.sleep(60)  # aguarda 1 min antes do primeiro ping
+        """Mantém o Render ativo"""
+        await asyncio.sleep(60)
         while True:
             try:
                 if AUTOPING:
@@ -74,36 +87,34 @@ class CustomBot(commands.Bot):
                         print("🔄 [AutoPing] Ping enviado com sucesso.")
             except Exception as e:
                 print(f"❌ [AutoPing] Erro ao enviar ping: {e}")
-            await asyncio.sleep(300)  # 5 min
-
-    async def on_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandNotFound):
-            return
-        print(f"❌ Erro não tratado: {type(error).__name__}: {error}")
+            await asyncio.sleep(300)  # 5 minutos
 
 
-# Instância do bot
+# ==========================
+# 🚀 Inicialização
+# ==========================
+
 bot = CustomBot(command_prefix="!", intents=intents)
 bot.remove_command("help")
 
 
-# Função para rodar o bot + Flask juntos
 async def main():
-    # Iniciar bot em background
+    """Executa Flask + Bot simultaneamente"""
     bot_task = asyncio.create_task(bot.start(TOKEN))
 
-    # Rodar Flask no mesmo loop
     from hypercorn.asyncio import serve
     from hypercorn.config import Config
 
     config = Config()
     config.bind = [f"0.0.0.0:{int(os.environ.get('PORT', 10000))}"]
-    
-    await serve(app, config)
+    config.worker_class = "asyncio"  # garante compatibilidade com bot
 
-    # Aguarda o bot terminar se o Flask parar (não deve ocorrer)
-    await bot_task
+    await serve(app, config)
+    await bot_task  # aguarda bot terminar (se Flask cair)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("👋 Encerrando aplicação...")
