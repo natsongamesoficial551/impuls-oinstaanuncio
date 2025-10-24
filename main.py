@@ -1,6 +1,5 @@
 import sys, types
-# Patch para "enganar" import de audioop em ambientes sem audioop (ex: Python 3.13 no Render).
-# IMPORTANTE: isso desativa recursos de áudio/voice — use apenas se não precisar de voz.
+# Patch para "enganar" import de audioop (desativa voice/audio)
 sys.modules['audioop'] = types.ModuleType('audioop')
 
 import os
@@ -11,6 +10,8 @@ import asyncio
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import aiohttp
+from hypercorn.asyncio import serve
+from hypercorn.config import Config
 
 # ==========================
 # 🔧 Configurações Iniciais
@@ -38,7 +39,6 @@ def home():
 @app.route("/status")
 def status():
     return jsonify({"status": "online", "bot": "Unibot Pagamentos", "version": "1.0"})
-
 
 # ==========================
 # 🤖 Bot Customizado
@@ -71,7 +71,7 @@ class CustomBot(commands.Bot):
                     print(f"❌ [ERRO] Falha ao carregar {filename}: {e}")
 
         print(f"📊 Total de cogs carregados: {cogs_carregados}")
-        asyncio.create_task(self.auto_ping())  # usa create_task direto
+        asyncio.create_task(self.auto_ping())
 
     async def on_ready(self):
         print("=" * 50)
@@ -92,8 +92,7 @@ class CustomBot(commands.Bot):
                         print("🔄 [AutoPing] Ping enviado com sucesso.")
             except Exception as e:
                 print(f"❌ [AutoPing] Erro ao enviar ping: {e}")
-            await asyncio.sleep(300)  # 5 minutos
-
+            await asyncio.sleep(300)
 
 # ==========================
 # 🚀 Inicialização
@@ -102,24 +101,18 @@ class CustomBot(commands.Bot):
 bot = CustomBot(command_prefix="!", intents=intents)
 bot.remove_command("help")
 
+async def run_bot():
+    await bot.start(TOKEN)
 
-async def main():
-    """Executa Flask + Bot simultaneamente"""
-    bot_task = asyncio.create_task(bot.start(TOKEN))
-
-    from hypercorn.asyncio import serve
-    from hypercorn.config import Config
-
+async def run_flask():
     config = Config()
     config.bind = [f"0.0.0.0:{int(os.environ.get('PORT', 10000))}"]
-    config.worker_class = "asyncio"  # garante compatibilidade com bot
-
+    config.worker_class = "asyncio"
     await serve(app, config)
-    await bot_task  # aguarda bot terminar (se Flask cair)
-
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        # roda Flask + Discord simultaneamente
+        asyncio.run(asyncio.gather(run_bot(), run_flask()))
     except KeyboardInterrupt:
         print("👋 Encerrando aplicação...")
