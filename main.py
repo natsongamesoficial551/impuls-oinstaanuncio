@@ -18,9 +18,6 @@ from hypercorn.asyncio import serve
 from hypercorn.config import Config
 from starlette.middleware.wsgi import WSGIMiddleware
 
-# ⚡ Evita erro de áudio no Render
-sys.modules['audioop'] = types.ModuleType('audioop')
-
 # ==========================
 # 🔧 Configurações Iniciais
 # ==========================
