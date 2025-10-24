@@ -1,5 +1,11 @@
 import sys
 import types
+
+# ⚡ Evita erro de áudio no Render
+sys.modules['audioop'] = types.ModuleType('audioop')
+
+import sys
+import types
 import os
 import discord
 from discord.ext import commands
